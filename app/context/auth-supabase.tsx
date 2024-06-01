@@ -2,6 +2,11 @@ import { useRootNavigation, useRouter, useSegments } from "expo-router";
 import React, { useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase-service";
 import { Session, User } from "@supabase/supabase-js";
+import { Linking } from "react-native";
+import * as AuthSession from 'expo-auth-session';
+import { jwtDecode } from "jwt-decode";
+import "core-js/stable/atob";
+
 
 // Define the AuthContextValue interface
 interface SignInResponse {
@@ -14,10 +19,18 @@ interface SignOutResponse {
   data: {} | undefined;
 }
 
+interface azureSignInResponse {
+  error: any | undefined;
+  data: {url: string} | undefined;
+
+}
+
 interface AuthContextValue {
   signIn: (e: string, p: string) => Promise<SignInResponse>;
   signUp: (e: string, p: string, n: string) => Promise<SignInResponse>;
   signOut: () => Promise<SignOutResponse>;
+  azure: () => Promise<azureSignInResponse>;
+  getAccessToken: (refreshToken: string) => Promise<SignInResponse>;
   user: User | null | undefined;
   authInitialized: boolean;
 }
@@ -136,8 +149,13 @@ export function Provider(props: ProviderProps) {
         password,
       });
       if (error) throw error;
-
+      console.log("Data", data);
+      
       setAuth(data.user);
+      console.log("User", data.user);
+      console.log("Session", data.session);
+      
+      
       setSession(data.session);
       return { data: user, error: undefined };
     } catch (error) {
@@ -146,6 +164,102 @@ export function Provider(props: ProviderProps) {
       return { error: error as Error, data: undefined };
     }
   };
+
+
+  const getAccessToken = async (refreshToken: string) => {
+    try {
+    const { data, error } = await supabase.auth.refreshSession({refresh_token: refreshToken});
+    if (error) throw error;
+      console.log("Data", data);
+      
+      setAuth(data.user);
+      console.log("User", data.user);
+      console.log("Session", data.session);
+      
+      
+      setSession(data.session);
+      return { data: user, error: undefined };
+    } catch (error) {
+      setAuth(null);
+      setSession(null);
+      return { error: error as Error, data: undefined };
+    }
+  }
+  const azureLogin = async () => {
+    console.log('Azure Login');
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "azure",
+        options: {
+          scopes: "email",
+        },
+        
+      });
+      
+      if (error) throw error;
+  
+      return { data: data, error: error };
+    } catch (error) {
+      setAuth(null);
+      setSession(null);
+      console.log(error);
+      console.log('Error');
+      
+      return { error: error as Error, data: undefined };
+    }
+  };
+
+  const handleURLChange = async (event: any) => {
+    console.log('Handle URL Change');
+    
+// Get the URL from the event object
+const url = event.url;
+console.log('event url', url);
+
+// Check if the URL starts with the redirect URI
+const redirectURI = AuthSession.makeRedirectUri();
+  console.log("redirect url", redirectURI);
+  
+if (url.startsWith(redirectURI || url.startsWith("exp://127.0.0.1:8081"))) {
+  // Remove the listener to prevent multiple calls
+   //Linking.removeEventListener("url");
+    Linking.removeAllListeners("url")
+    
+  // Parse the URL and get the access token
+  const queryParams = new URLSearchParams(url.split("#")[1]);
+  
+  const accessToken = queryParams.get("access_token");
+  const refreshToken = queryParams.get("refresh_token");
+  console.log(accessToken);
+  
+  if (accessToken) {
+    const decodedToken = jwtDecode(accessToken);
+    // var email = decodedToken.email;
+
+
+    console.log(decodedToken);
+  } else {
+    console.log('Access token not found');
+  }
+ if (refreshToken) {
+   const { data, error } = await supabase.auth.refreshSession({refresh_token: refreshToken})
+   const { session, user } = data
+  console.log(session, user);
+  
+ }
+
+
+
+
+  // Update state with access token
+  // setAccessToken(accessToken);
+    
+  // Set the access token as a header for Supabase requests
+ 
+  // setSession(accessToken)
+}}
+
 
   /**
    *
@@ -193,6 +307,8 @@ export function Provider(props: ProviderProps) {
         signIn: login,
         signOut: logout,
         signUp: createAcount,
+        azure: azureLogin,
+        getAccessToken: getAccessToken,
         user,
         authInitialized,
       }}

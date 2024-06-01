@@ -8,10 +8,15 @@ import {
 import { useAuth } from "../context/auth-supabase";
 import { Stack, useRouter } from "expo-router";
 import { useRef } from "react";
+import { useState } from "react";
 
 export default function SignIn() {
-  const { signIn } = useAuth();
+  const { signIn, azure } = useAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [displayWebView, setDisplayWebView] = useState(false);
+const [webviewUrl, setWebviewUrl] = useState("");
+
 
   const emailRef = useRef("");
   const passwordRef = useRef("");
@@ -61,6 +66,34 @@ export default function SignIn() {
         >
           <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
+
+
+        <TouchableOpacity
+          onPress={async () => {
+            const { data, error } = await azure();
+            if (data) {
+              router.replace("/");
+            } else {
+              console.log(error);
+              // Alert.alert("Login Error", resp.error?.message);
+            }
+          }}
+          style={styles.button}
+        >
+          <Text style={styles.buttonText}>Azure</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={async () => {
+
+              router.replace("/WebViewLogin");
+ 
+          }}
+          style={styles.button}
+        >
+          <Text style={styles.buttonText}>WebView Test</Text>
+        </TouchableOpacity>
+
         <View style={{ marginTop: 32 }}>
           <Text
             style={{ fontWeight: "500" }}
